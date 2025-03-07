@@ -3,11 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control ESP32</title>
+    <title>Configuración ESP32</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, button {
+            margin-top: 5px;
+            padding: 8px;
+            width: 100%;
+            max-width: 300px;
         }
         #output {
             margin-top: 20px;
@@ -19,12 +32,39 @@
     </style>
 </head>
 <body>
-    <h1>Control ESP32</h1>
-    <form id="wsForm">
-        <label for="command">Comando:</label>
-        <input type="text" id="command" name="command" placeholder="Ej: get_sensor" required>
-        <button type="submit">Enviar</button>
+    <h1>Configuración ESP32</h1>
+
+    <!-- Formulario para obtener la configuración actual -->
+    <form id="getConfigForm">
+        <button type="submit">Obtener Configuración Actual</button>
     </form>
+
+    <!-- Formulario para actualizar la configuración -->
+    <form id="setConfigForm">
+        <h2>Actualizar Configuración</h2>
+        <label for="wifiSsid">WiFi SSID:</label>
+        <input type="text" id="wifiSsid" name="wifiSsid" required>
+        <label for="wifiPassword">WiFi Password:</label>
+        <input type="text" id="wifiPassword" name="wifiPassword" required>
+        <label for="mqttServer">MQTT Server:</label>
+        <input type="text" id="mqttServer" name="mqttServer" required>
+        <label for="mqttPort">MQTT Port:</label>
+        <input type="text" id="mqttPort" name="mqttPort" required>
+        <label for="mqttUser">MQTT User:</label>
+        <input type="text" id="mqttUser" name="mqttUser" required>
+        <label for="mqttPassword">MQTT Password:</label>
+        <input type="text" id="mqttPassword" name="mqttPassword" required>
+        <label for="mqttRootTopic">MQTT Root Topic:</label>
+        <input type="text" id="mqttRootTopic" name="mqttRootTopic" required>
+        <button type="submit">Guardar Configuración</button>
+    </form>
+
+    <!-- Botón para reiniciar el ESP32 -->
+    <form id="restartForm">
+        <button type="submit">Reiniciar ESP32</button>
+    </form>
+
+    <!-- Área para mostrar respuestas -->
     <div id="output">Respuestas del servidor aparecerán aquí...</div>
 
     <script>
@@ -52,12 +92,39 @@
             console.log('Conexión WebSocket cerrada');
         });
 
-        // Enviar comandos desde el formulario
-        const form = document.getElementById('wsForm');
-        form.addEventListener('submit', (event) => {
+        // Obtener la configuración actual
+        const getConfigForm = document.getElementById('getConfigForm');
+        getConfigForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            const command = document.getElementById('command').value;
-            const message = JSON.stringify({ command: command });
+            const message = JSON.stringify({ command: "get_config" });
+            socket.send(message);
+        });
+
+        // Actualizar la configuración
+        const setConfigForm = document.getElementById('setConfigForm');
+        setConfigForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const config = {
+                command: "set_config",
+                value: {                  
+                    wifi_Ssid: document.getElementById('wifiSsid').value,
+                    wifi_Password: document.getElementById('wifiPassword').value,
+                    mqtt_Server: document.getElementById('mqttServer').value,
+                    mqtt_brokerPort: document.getElementById('mqttPort').value,
+                    mqtt_User: document.getElementById('mqttUser').value,
+                    mqtt_Password: document.getElementById('mqttPassword').value,
+                    mqtt_RootTopic: document.getElementById('mqttRootTopic').value
+                }
+            };
+            const message = JSON.stringify(config);
+            socket.send(message);
+        });
+
+        // Reiniciar el ESP32
+        const restartForm = document.getElementById('restartForm');
+        restartForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "restart" });
             socket.send(message);
         });
     </script>
