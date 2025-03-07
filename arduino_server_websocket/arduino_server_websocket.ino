@@ -222,6 +222,23 @@ String getDeviceInfo() {
     return jsonString;
 }
 
+String getSensorData() {
+    DynamicJsonDocument doc(256);
+    doc["accelX"] = mpu6050.getAccX();
+    doc["accelY"] = mpu6050.getAccY();
+    doc["accelZ"] = mpu6050.getAccZ();
+    doc["gyroX"] = mpu6050.getGyroX();
+    doc["gyroY"] = mpu6050.getGyroY();
+    doc["gyroZ"] = mpu6050.getGyroZ();
+    doc["angleX"] = mpu6050.getAngleX();
+    doc["angleY"] = mpu6050.getAngleY();
+    doc["angleZ"] = mpu6050.getAngleZ();
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}
+
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -276,6 +293,9 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         } else if (command == "get_info") {
             String info = getDeviceInfo();
             ws.textAll(info);
+        } else if (command == "get_sensor") {
+            String sensorData = getSensorData();
+            ws.textAll(sensorData);
         }
     }
 }
