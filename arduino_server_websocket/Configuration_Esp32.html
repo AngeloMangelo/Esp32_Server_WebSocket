@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control ESP32</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Control ESP32</h1>
+    <form id="wsForm">
+        <label for="command">Comando:</label>
+        <input type="text" id="command" name="command" placeholder="Ej: get_sensor" required>
+        <button type="submit">Enviar</button>
+    </form>
+    <div id="output">Respuestas del servidor aparecerán aquí...</div>
+
+    <script>
+        // Conectar al servidor WebSocket
+        const socket = new WebSocket('ws://192.168.4.1/ws');
+
+        // Manejar la apertura de la conexión
+        socket.addEventListener('open', (event) => {
+            console.log('Conexión WebSocket establecida');
+        });
+
+        // Manejar mensajes recibidos del servidor
+        socket.addEventListener('message', (event) => {
+            const output = document.getElementById('output');
+            output.textContent = event.data;
+        });
+
+        // Manejar errores
+        socket.addEventListener('error', (event) => {
+            console.error('Error en la conexión WebSocket:', event);
+        });
+
+        // Manejar el cierre de la conexión
+        socket.addEventListener('close', (event) => {
+            console.log('Conexión WebSocket cerrada');
+        });
+
+        // Enviar comandos desde el formulario
+        const form = document.getElementById('wsForm');
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const command = document.getElementById('command').value;
+            const message = JSON.stringify({ command: command });
+            socket.send(message);
+        });
+    </script>
+</body>
+</html>
