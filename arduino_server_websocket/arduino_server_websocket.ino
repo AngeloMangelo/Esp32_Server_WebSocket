@@ -36,6 +36,139 @@ const String maxValues = "Aceleración: +2g, Giro: +250°/s, Ángulo: +180°";
 const unsigned long WIFI_CHECK_INTERVAL = 5000;
 const int MAX_RECONNECT_ATTEMPTS = 3;
 
+
+
+// Página web embebida
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración ESP32</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input, button {
+            margin-top: 5px;
+            padding: 8px;
+            width: 100%;
+            max-width: 300px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Configuración ESP32</h1>
+
+    <form id="getConfigForm">
+        <button type="submit">Obtener Configuración Actual</button>
+    </form>
+
+    <form id="setConfigForm">
+        <h2>Actualizar Configuración</h2>
+        <label for="wifiSsid">WiFi SSID:</label>
+        <input type="text" id="wifiSsid" name="wifiSsid" required>
+        <label for="wifiPassword">WiFi Password:</label>
+        <input type="text" id="wifiPassword" name="wifiPassword" required>
+        <label for="mqttServer">MQTT Server:</label>
+        <input type="text" id="mqttServer" name="mqttServer" required>
+        <label for="mqttPort">MQTT Port:</label>
+        <input type="text" id="mqttPort" name="mqttPort" required>
+        <label for="mqttUser">MQTT User:</label>
+        <input type="text" id="mqttUser" name="mqttUser" required>
+        <label for="mqttPassword">MQTT Password:</label>
+        <input type="text" id="mqttPassword" name="mqttPassword" required>
+        <label for="mqttRootTopic">MQTT Root Topic:</label>
+        <input type="text" id="mqttRootTopic" name="mqttRootTopic" required>
+        <button type="submit">Guardar Configuración</button>
+    </form>
+
+    <form id="restartForm">
+        <button type="submit">Reiniciar ESP32</button>
+    </form>
+
+    <!-- Botones adicionales -->
+    <button id="getSensor">Obtener Datos del Sensor</button>
+    <button id="getInfo">Obtener Especificaciones del Sensor</button>
+
+    <div id="output">Respuestas del servidor aparecerán aquí...</div>
+
+    <script>
+        const socket = new WebSocket('ws://192.168.4.1/ws');
+
+        socket.addEventListener('open', () => {
+            console.log('Conexión WebSocket establecida');
+            socket.send(JSON.stringify({ command: "get_config" }));
+        });
+
+        socket.addEventListener('message', (event) => {
+            const output = document.getElementById('output');
+            output.textContent = JSON.stringify(JSON.parse(event.data), null, 2);
+        });
+
+        document.getElementById('getConfigForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            socket.send(JSON.stringify({ command: "get_config" }));
+        });
+
+        document.getElementById('setConfigForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const config = {
+                command: "set_config",
+                value: {
+                    User: "admin",
+                    Password: "admin",
+                    wifi_Ssid: document.getElementById('wifiSsid').value,
+                    wifi_Password: document.getElementById('wifiPassword').value,
+                    mqtt_Server: document.getElementById('mqttServer').value,
+                    mqtt_brokerPort: document.getElementById('mqttPort').value,
+                    mqtt_User: document.getElementById('mqttUser').value,
+                    mqtt_Password: document.getElementById('mqttPassword').value,
+                    mqtt_RootTopic: document.getElementById('mqttRootTopic').value
+                }
+            };
+            socket.send(JSON.stringify(config));
+        });
+
+        document.getElementById('restartForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            socket.send(JSON.stringify({ command: "restart" }));
+        });
+
+        document.getElementById('getSensor').addEventListener('click', () => {
+            socket.send(JSON.stringify({ command: "get_sensor" }));
+        });
+
+        document.getElementById('getInfo').addEventListener('click', () => {
+            socket.send(JSON.stringify({ command: "get_info" }));
+        });
+    </script>
+</body>
+</
+)rawliteral";
+
+
+
+
+
+
+
 // Funciones
 void loadCredentials() {
     prefs.begin("config", true);
@@ -82,6 +215,11 @@ void setupAP() {
         Serial.println("IP: " + WiFi.softAPIP().toString());
         isAPMode = true;
     }
+
+    // Servir la página web
+        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+            request->send_P(200, "text/html", index_html);
+        });
 }
 
 bool tryWiFiConnection() {
@@ -357,10 +495,6 @@ void setup() {
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(200, "text/plain", "ESP32 WebSocket Server");
-    });
-
     server.begin();
     Serial.println("Servidor WebSocket iniciado");
 }
@@ -398,4 +532,4 @@ void loop() {
     }
 
     ws.cleanupClients();
-}      
+} 
