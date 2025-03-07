@@ -81,9 +81,68 @@ La página web embebida permite:
 - **Reiniciar ESP32**: Reinicia el dispositivo.
 - **Consultar datos del sensor**: Para poder ver si se estan mandando correctamente los datos del sensor  sus especificaciones.
 
+![pagina](https://github.com/user-attachments/assets/9850948e-73ab-48a2-a034-76872b008684)
+
+
 ### Ejemplo de Comandos
 - **Obtener Configuración Actual**:
   ```json
   {
     "command": "get_config"
   }
+
+- **Actualizar Configuración**:
+  ```json
+  {
+  "command": "set_config",
+  "value": {
+    "wifi_Ssid": "MiWiFi",
+    "wifi_Password": "12345678",
+    "mqtt_Server": "broker.emqx.io",
+    "mqtt_brokerPort": "1883",
+    "mqtt_User": "usuario",
+    "mqtt_Password": "contraseña",
+    "mqtt_RootTopic": "esp32"
+  }
+
+- **Reiniciar ESP32**:
+  ```json
+  {
+    "command": "restart"
+  }
+
+## Instrucciones de Uso
+1. Carga el código en tu ESP32.
+2. Conéctate a la red WiFi configurada o al modo AP del ESP32.
+3. Usa la página web para configurar y monitorear el ESP32.
+4. Verifica que los datos del MPU6050 se publiquen en el tópico MQTT especificado (`mqttRootTopic + "/mpu6050"`).
+
+---
+
+## Estructura del Código
+- **`loadCredentials()`**: Carga las credenciales desde la memoria no volátil.
+- **`saveCredentials()`**: Guarda las credenciales en la memoria no volátil.
+- **`setupAP()`**: Configura el ESP32 como punto de acceso y sirve la página web.
+- **`tryWiFiConnection()`**: Intenta conectar a una red WiFi.
+- **`checkWiFiConnection()`**: Verifica y maneja la reconexión WiFi.
+- **`sendMPU6050Data()`**: Envía los datos del MPU6050 a través de WebSocket y MQTT.
+- **`setupMQTT()`**: Configura el cliente MQTT.
+- **`connectMQTT()`**: Conecta al broker MQTT.
+- **`handleWebSocketMessage()`**: Maneja los mensajes recibidos a través de WebSocket.
+
+---
+
+## Ejemplo de Datos Publicados
+Los datos del MPU6050 se publican en formato JSON:
+```json
+{
+  "accelX": 123.45,
+  "accelY": 456.78,
+  "accelZ": 789.01,
+  "gyroX": 12.34,
+  "gyroY": 56.78,
+  "gyroZ": 90.12,
+  "angleX": 45.67,
+  "angleY": 89.01,
+  "angleZ": 23.45
+}
