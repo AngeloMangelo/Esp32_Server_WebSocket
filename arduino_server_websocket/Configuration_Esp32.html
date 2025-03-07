@@ -74,12 +74,29 @@
         // Manejar la apertura de la conexión
         socket.addEventListener('open', (event) => {
             console.log('Conexión WebSocket establecida');
+            // Obtener la configuración actual al cargar la página
+            const message = JSON.stringify({ command: "get_config" });
+            socket.send(message);
         });
 
         // Manejar mensajes recibidos del servidor
         socket.addEventListener('message', (event) => {
             const output = document.getElementById('output');
-            output.textContent = event.data;
+            const data = JSON.parse(event.data);
+
+            // Si la respuesta es la configuración actual, rellenar el formulario
+            if (data.User !== undefined) {
+                document.getElementById('wifiSsid').value = data.wifi_Ssid || "";
+                document.getElementById('wifiPassword').value = data.wifi_Password || "";
+                document.getElementById('mqttServer').value = data.mqtt_Server || "";
+                document.getElementById('mqttPort').value = data.mqtt_brokerPort || "";
+                document.getElementById('mqttUser').value = data.mqtt_User || "";
+                document.getElementById('mqttPassword').value = data.mqtt_Password || "";
+                document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
+            }
+
+            // Mostrar la respuesta en el área de salida
+            output.textContent = JSON.stringify(data, null, 2);
         });
 
         // Manejar errores
@@ -106,7 +123,9 @@
             event.preventDefault();
             const config = {
                 command: "set_config",
-                value: {                  
+                value: {
+                    User: "admin", // Valor predeterminado
+                    Password: "admin", // Valor predeterminado
                     wifi_Ssid: document.getElementById('wifiSsid').value,
                     wifi_Password: document.getElementById('wifiPassword').value,
                     mqtt_Server: document.getElementById('mqttServer').value,
