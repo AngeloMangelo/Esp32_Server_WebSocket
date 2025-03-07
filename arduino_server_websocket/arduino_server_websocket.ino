@@ -4,8 +4,9 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <esp_system.h>
-#include <MPU6050.h>
-#include <PubSubClient.h>
+#include <Wire.h>
+#include <MPU6050_tockn.h> 
+#include <PubSubClient.h> 
 
 
 Preferences prefs;
@@ -14,29 +15,28 @@ AsyncWebSocket ws("/ws");
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-
+// Variables de configuración
 String User, Password, wifiSsid, wifiPassword, apSsid, apPassword;
 bool isAPMode = false, mqttEnabled;
 String mqttServer, mqttPort, mqttUser, mqttPassword, mqttRootTopic;
 
 // Variables del MPU6050
-MPU6050 mpu;
-int16_t ax, ay, az; // Acelerómetro
-int16_t gx, gy, gz; // Giroscopio
+MPU6050 mpu6050(Wire); // Objeto MPU6050 con la nueva librería
+bool mpuConnected = false; // Bandera para verificar si el MPU6050 está conectado
 
-
+// Información del dispositivo
 const String iotId = String(ESP.getEfuseMac(), HEX);
 const String iotName = "ESP32_MPU6050";
 const String iotFunction = "Sensor de Movimiento";
-const String physicalVariables = "Aceleración (X, Y, Z), Giro (X, Y, Z)";
-const String minValues = "Aceleración: -2g, Giro: -250°/s";
-const String maxValues = "Aceleración: +2g, Giro: +250°/s";
+const String physicalVariables = "Aceleración (X, Y, Z), Giro (X, Y, Z), Ángulo (X, Y, Z)";
+const String minValues = "Aceleración: -2g, Giro: -250°/s, Ángulo: -180°";
+const String maxValues = "Aceleración: +2g, Giro: +250°/s, Ángulo: +180°";
 
-
+// Constantes
 const unsigned long WIFI_CHECK_INTERVAL = 5000;
 const int MAX_RECONNECT_ATTEMPTS = 3;
 
-
+// Funciones
 void loadCredentials() {
     prefs.begin("config", true);
     User = prefs.getString("User", "admin");
@@ -50,7 +50,7 @@ void loadCredentials() {
     mqttPort = prefs.getString("mqttPort", "1883");
     mqttUser = prefs.getString("mqttUser", "iot");
     mqttPassword = prefs.getString("mqttPass", "1234");
-    mqttRootTopic = prefs.getString("mqttRoot", "esp32/mpu6050");
+    mqttRootTopic = prefs.getString("mqttRoot", "esp32");
     prefs.end();
 }
 
@@ -144,18 +144,49 @@ bool connectMQTT() {
     }
 }
 
+bool initializeMPU6050() {
+    Wire.begin(); // Reiniciar el bus I2C
+    mpu6050.begin();
+    delay(100); // Pequeño retardo para estabilizar la comunicación
+
+    // Verificar si el MPU6050 responde
+    Wire.beginTransmission(0x68); // Dirección I2C del MPU6050
+    if (Wire.endTransmission() == 0) {
+        mpu6050.calcGyroOffsets(true); // Calibración del giroscopio
+        Serial.println("MPU6050 inicializado correctamente");
+        mpuConnected = true;
+        return true;
+    } else {
+        Serial.println("Error al inicializar el MPU6050. Verifica la conexión.");
+        mpuConnected = false;
+        return false;
+    }
+}
+
 void sendMPU6050Data() {
+    if (!mpuConnected) {
+        Serial.println("MPU6050 no está conectado. Intentando reinicializar...");
+        if (!initializeMPU6050()) {
+            Serial.println("No se pudo reinicializar el MPU6050");
+            return;
+        }
+    }
+
     DynamicJsonDocument doc(256);
-    doc["accelX"] = ax;
-    doc["accelY"] = ay;
-    doc["accelZ"] = az;
-    doc["gyroX"] = gx;
-    doc["gyroY"] = gy;
-    doc["gyroZ"] = gz;
+    doc["accelX"] = mpu6050.getAccX();
+    doc["accelY"] = mpu6050.getAccY();
+    doc["accelZ"] = mpu6050.getAccZ();
+    doc["gyroX"] = mpu6050.getGyroX();
+    doc["gyroY"] = mpu6050.getGyroY();
+    doc["gyroZ"] = mpu6050.getGyroZ();
+    doc["angleX"] = mpu6050.getAngleX();
+    doc["angleY"] = mpu6050.getAngleY();
+    doc["angleZ"] = mpu6050.getAngleZ();
 
     String jsonString;
     serializeJson(doc, jsonString);
 
+    // Enviar datos por WebSocket
     ws.textAll(jsonString);
 
     // Enviar datos por MQTT si hay conexión WiFi y MQTT está habilitado
@@ -171,8 +202,9 @@ void sendMPU6050Data() {
     }
 
     Serial.println("Datos del MPU6050:");
-    Serial.println("Acelerómetro (X, Y, Z): " + String(ax) + ", " + String(ay) + ", " + String(az));
-    Serial.println("Giroscopio (X, Y, Z): " + String(gx) + ", " + String(gy) + ", " + String(gz));
+    Serial.println("Acelerómetro (X, Y, Z): " + String(mpu6050.getAccX()) + ", " + String(mpu6050.getAccY()) + ", " + String(mpu6050.getAccZ()));
+    Serial.println("Giroscopio (X, Y, Z): " + String(mpu6050.getGyroX()) + ", " + String(mpu6050.getGyroY()) + ", " + String(mpu6050.getGyroZ()));
+    Serial.println("Ángulo (X, Y, Z): " + String(mpu6050.getAngleX()) + ", " + String(mpu6050.getAngleY()) + ", " + String(mpu6050.getAngleZ()));
     Serial.println("-----------------------------");
 }
 
@@ -267,8 +299,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 
 void readMPU6050(void *pvParameters) {
     while (1) {
-        mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        if (mpuConnected) {
+            mpu6050.update(); // Actualizar datos del MPU6050
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Pequeño retardo para evitar sobrecargar el núcleo
     }
 }
 
@@ -279,19 +313,26 @@ void setup() {
     loadCredentials();
 
     // Inicializar MPU6050
-    mpu.initialize();
-    if (!mpu.testConnection()) {
-        Serial.println("MPU6050 no encontrado");
-    } else {
-        Serial.println("MPU6050 inicializado");
-        xTaskCreatePinnedToCore(readMPU6050, "MPU6050_Task", 10000, NULL, 1, NULL, 1);
+    if (!initializeMPU6050()) {
+        Serial.println("Error al inicializar el MPU6050. Verifica la conexión.");
     }
+
+    // Crear una tarea para leer el MPU6050 en el segundo núcleo (Core 0)
+    xTaskCreatePinnedToCore(
+        readMPU6050,    // Función que implementa la tarea
+        "MPU6050_Task", // Nombre de la tarea
+        10000,          // Tamaño de la pila (en palabras)
+        NULL,           // Parámetros de la tarea
+        1,              // Prioridad de la tarea
+        NULL,           // Manejador de la tarea
+        0               // Núcleo donde se ejecutará (0 para Core 0)
+    );
 
     if (!tryWiFiConnection()) {
         setupAP();
     }
 
-    setupMQTT(); 
+    setupMQTT(); // Configurar MQTT
 
     ws.onEvent(onWsEvent);
     server.addHandler(&ws);
@@ -307,10 +348,12 @@ void setup() {
 void loop() {
     static unsigned long lastSend = 0;
 
+    // Verificar conexión WiFi
     if (WiFi.status() != WL_CONNECTED) {
         checkWiFiConnection();
     }
 
+    // Verificar conexión MQTT si está habilitado
     if (mqttEnabled && WiFi.status() == WL_CONNECTED) {
         if (!mqttClient.connected()) {
             Serial.println("Intentando reconectar al broker MQTT...");
@@ -333,5 +376,6 @@ void loop() {
         }
         lastSend = millis();
     }
+
     ws.cleanupClients();
 }      

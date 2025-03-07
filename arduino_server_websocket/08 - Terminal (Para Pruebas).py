@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 ESP32_IP = "192.168.4.1"
-#ESP32_IP = "192.168.4.1"
+#ESP32_IP = "192.168.4.1" 
 WS_URL = f"ws://{ESP32_IP}/ws"
 
 class WebSocketClient:
