@@ -34,12 +34,10 @@
 <body>
     <h1>Configuración ESP32</h1>
 
-    <!-- Formulario para obtener la configuración actual -->
     <form id="getConfigForm">
         <button type="submit">Obtener Configuración Actual</button>
     </form>
 
-    <!-- Formulario para actualizar la configuración -->
     <form id="setConfigForm">
         <h2>Actualizar Configuración</h2>
         <label for="wifiSsid">WiFi SSID:</label>
@@ -59,73 +57,41 @@
         <button type="submit">Guardar Configuración</button>
     </form>
 
-    <!-- Botón para reiniciar el ESP32 -->
     <form id="restartForm">
         <button type="submit">Reiniciar ESP32</button>
     </form>
 
-    <!-- Área para mostrar respuestas -->
+    <!-- Botones adicionales -->
+    <button id="getSensor">Obtener Datos del Sensor</button>
+    <button id="getInfo">Obtener Especificaciones del Sensor</button>
+
     <div id="output">Respuestas del servidor aparecerán aquí...</div>
 
     <script>
-        // Conectar al servidor WebSocket
         const socket = new WebSocket('ws://192.168.4.1/ws');
 
-        // Manejar la apertura de la conexión
-        socket.addEventListener('open', (event) => {
+        socket.addEventListener('open', () => {
             console.log('Conexión WebSocket establecida');
-            // Obtener la configuración actual al cargar la página
-            const message = JSON.stringify({ command: "get_config" });
-            socket.send(message);
+            socket.send(JSON.stringify({ command: "get_config" }));
         });
 
-        // Manejar mensajes recibidos del servidor
         socket.addEventListener('message', (event) => {
             const output = document.getElementById('output');
-            const data = JSON.parse(event.data);
-
-            // Si la respuesta es la configuración actual, rellenar el formulario
-            if (data.User !== undefined) {
-                document.getElementById('wifiSsid').value = data.wifi_Ssid || "";
-                document.getElementById('wifiPassword').value = data.wifi_Password || "";
-                document.getElementById('mqttServer').value = data.mqtt_Server || "";
-                document.getElementById('mqttPort').value = data.mqtt_brokerPort || "";
-                document.getElementById('mqttUser').value = data.mqtt_User || "";
-                document.getElementById('mqttPassword').value = data.mqtt_Password || "";
-                document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
-            }
-
-            // Mostrar la respuesta en el área de salida
-            output.textContent = JSON.stringify(data, null, 2);
+            output.textContent = JSON.stringify(JSON.parse(event.data), null, 2);
         });
 
-        // Manejar errores
-        socket.addEventListener('error', (event) => {
-            console.error('Error en la conexión WebSocket:', event);
-        });
-
-        // Manejar el cierre de la conexión
-        socket.addEventListener('close', (event) => {
-            console.log('Conexión WebSocket cerrada');
-        });
-
-        // Obtener la configuración actual
-        const getConfigForm = document.getElementById('getConfigForm');
-        getConfigForm.addEventListener('submit', (event) => {
+        document.getElementById('getConfigForm').addEventListener('submit', (event) => {
             event.preventDefault();
-            const message = JSON.stringify({ command: "get_config" });
-            socket.send(message);
+            socket.send(JSON.stringify({ command: "get_config" }));
         });
 
-        // Actualizar la configuración
-        const setConfigForm = document.getElementById('setConfigForm');
-        setConfigForm.addEventListener('submit', (event) => {
+        document.getElementById('setConfigForm').addEventListener('submit', (event) => {
             event.preventDefault();
             const config = {
                 command: "set_config",
                 value: {
-                    User: "admin", // Valor predeterminado
-                    Password: "admin", // Valor predeterminado
+                    User: "admin",
+                    Password: "admin",
                     wifi_Ssid: document.getElementById('wifiSsid').value,
                     wifi_Password: document.getElementById('wifiPassword').value,
                     mqtt_Server: document.getElementById('mqttServer').value,
@@ -135,16 +101,20 @@
                     mqtt_RootTopic: document.getElementById('mqttRootTopic').value
                 }
             };
-            const message = JSON.stringify(config);
-            socket.send(message);
+            socket.send(JSON.stringify(config));
         });
 
-        // Reiniciar el ESP32
-        const restartForm = document.getElementById('restartForm');
-        restartForm.addEventListener('submit', (event) => {
+        document.getElementById('restartForm').addEventListener('submit', (event) => {
             event.preventDefault();
-            const message = JSON.stringify({ command: "restart" });
-            socket.send(message);
+            socket.send(JSON.stringify({ command: "restart" }));
+        });
+
+        document.getElementById('getSensor').addEventListener('click', () => {
+            socket.send(JSON.stringify({ command: "get_sensor" }));
+        });
+
+        document.getElementById('getInfo').addEventListener('click', () => {
+            socket.send(JSON.stringify({ command: "get_info" }));
         });
     </script>
 </body>
