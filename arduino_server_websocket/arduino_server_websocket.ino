@@ -76,10 +76,12 @@ const char index_html[] PROGMEM = R"rawliteral(
 <body>
     <h1>Configuración ESP32</h1>
 
+    <!-- Formulario para obtener la configuración actual -->
     <form id="getConfigForm">
         <button type="submit">Obtener Configuración Actual</button>
     </form>
 
+    <!-- Formulario para actualizar la configuración -->
     <form id="setConfigForm">
         <h2>Actualizar Configuración</h2>
         <label for="wifiSsid">WiFi SSID:</label>
@@ -99,43 +101,88 @@ const char index_html[] PROGMEM = R"rawliteral(
         <button type="submit">Guardar Configuración</button>
     </form>
 
+    <!-- Botón para obtener información del dispositivo -->
+    <form id="getInfoForm">
+        <button type="submit">Obtener Información del Dispositivo</button>
+    </form>
+
+    <!-- Botón para obtener datos del sensor -->
+    <form id="getSensorForm">
+        <button type="submit">Obtener Datos del Sensor</button>
+    </form>
+
+    <!-- Botón para reiniciar el ESP32 -->
     <form id="restartForm">
         <button type="submit">Reiniciar ESP32</button>
     </form>
 
-    <!-- Botones adicionales -->
-    <button id="getSensor">Obtener Datos del Sensor</button>
-    <button id="getInfo">Obtener Especificaciones del Sensor</button>
-
+    <!-- Área para mostrar respuestas -->
     <div id="output">Respuestas del servidor aparecerán aquí...</div>
 
     <script>
-        const socket = new WebSocket('ws://192.168.4.1/ws');
+        // Conectar al servidor WebSocket
+        const socket = new WebSocket('ws://' + window.location.hostname + '/ws');
 
-        socket.addEventListener('open', () => {
+        // Manejar la apertura de la conexión
+        socket.addEventListener('open', (event) => {
             console.log('Conexión WebSocket establecida');
-            socket.send(JSON.stringify({ command: "get_config" }));
+            // Obtener la configuración actual al cargar la página
+            const message = JSON.stringify({ command: "get_config" });
+            socket.send(message);
         });
 
+        // Manejar mensajes recibidos del servidor
         socket.addEventListener('message', (event) => {
             const output = document.getElementById('output');
-            output.textContent = JSON.stringify(JSON.parse(event.data), null, 2);
+            const data = JSON.parse(event.data);
+
+            // Si la respuesta es la configuración actual, rellenar el formulario
+            if (data.User !== undefined) {
+                document.getElementById('wifiSsid').value = data.wifi_Ssid || "";
+                document.getElementById('wifiPassword').value = data.wifi_Password || "";
+                document.getElementById('mqttServer').value = data.mqtt_Server || "";
+                document.getElementById('mqttPort').value = data.mqtt_brokerPort || "";
+                document.getElementById('mqttUser').value = data.mqtt_User || "";
+                document.getElementById('mqttPassword').value = data.mqtt_Password || "";
+                document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
+            }
+
+            // Mostrar la respuesta en el área de salida
+            output.textContent = JSON.stringify(data, null, 2);
         });
 
-        document.getElementById('getConfigForm').addEventListener('submit', (event) => {
+        // Manejar errores
+        socket.addEventListener('error', (event) => {
+            console.error('Error en la conexión WebSocket:', event);
+        });
+
+        // Manejar el cierre de la conexión
+        socket.addEventListener('close', (event) => {
+            console.log('Conexión WebSocket cerrada');
+        });
+
+        // Obtener la configuración actual
+        const getConfigForm = document.getElementById('getConfigForm');
+        getConfigForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            socket.send(JSON.stringify({ command: "get_config" }));
+            const message = JSON.stringify({ command: "get_config" });
+            socket.send(message);
         });
 
-        document.getElementById('setConfigForm').addEventListener('submit', (event) => {
+        // Actualizar la configuración
+        const setConfigForm = document.getElementById('setConfigForm');
+        setConfigForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const config = {
                 command: "set_config",
                 value: {
-                    User: "admin",
-                    Password: "admin",
+                    User: "admin", // Valor predeterminado
+                    Password: "admin", // Valor predeterminado
                     wifi_Ssid: document.getElementById('wifiSsid').value,
                     wifi_Password: document.getElementById('wifiPassword').value,
+                    ap_Ssid: "ESP32_IoT", 
+                    ap_Password: "1234567890", 
+                    mqtt_enabled: true, 
                     mqtt_Server: document.getElementById('mqttServer').value,
                     mqtt_brokerPort: document.getElementById('mqttPort').value,
                     mqtt_User: document.getElementById('mqttUser').value,
@@ -143,24 +190,34 @@ const char index_html[] PROGMEM = R"rawliteral(
                     mqtt_RootTopic: document.getElementById('mqttRootTopic').value
                 }
             };
-            socket.send(JSON.stringify(config));
+            const message = JSON.stringify(config);
+            socket.send(message);
         });
 
-        document.getElementById('restartForm').addEventListener('submit', (event) => {
+        // Obtener información del dispositivo
+        const getInfoForm = document.getElementById('getInfoForm');
+        getInfoForm.addEventListener('submit', (event) => {
             event.preventDefault();
-            socket.send(JSON.stringify({ command: "restart" }));
+            const message = JSON.stringify({ command: "get_info" });
+            socket.send(message);
         });
 
-        document.getElementById('getSensor').addEventListener('click', () => {
-            socket.send(JSON.stringify({ command: "get_sensor" }));
+        const getSensorForm = document.getElementById('getSensorForm');
+        getSensorForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "get_sensor" });
+            socket.send(message);
         });
 
-        document.getElementById('getInfo').addEventListener('click', () => {
-            socket.send(JSON.stringify({ command: "get_info" }));
+        const restartForm = document.getElementById('restartForm');
+        restartForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "restart" });
+            socket.send(message);
         });
     </script>
 </body>
-</
+</html>
 )rawliteral";
 
 
