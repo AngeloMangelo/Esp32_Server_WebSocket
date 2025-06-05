@@ -47,9 +47,13 @@ const char index_html[] PROGMEM = R"rawliteral(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración ESP32</title>
+
+    <!-- Incluimos Chart.js desde CDN para dibujar el gráfico -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         :root {
-            --primary:#424669 ;
+            --primary: #424669;
             --secondary: #2E3150;
             --text: #afafaf;
             --card: #2E3150;
@@ -61,8 +65,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             margin: 0;
             background-color: var(--secondary);
             color: var(--text);
-            min-height: 100vh;
-            overflow: hidden; /* Evitar scroll antes del login */
+            /* Eliminamos overflow: hidden para permitir scroll si fuera necesario */
         }
 
         /* Menú lateral */
@@ -139,6 +142,9 @@ const char index_html[] PROGMEM = R"rawliteral(
             padding: 2rem;
             transition: margin-left 0.3s ease;
             display: none; /* Ocultar inicialmente */
+            height: 100vh;           /* Ocupamos toda la altura de la ventana */
+            overflow-y: auto;        /* Permitimos scroll interno si hace falta */
+            box-sizing: border-box;
         }
 
         .section {
@@ -251,6 +257,15 @@ const char index_html[] PROGMEM = R"rawliteral(
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* Canvas del gráfico */
+        #gyroChart {
+            background-color: #ffffff;
+            border-radius: 8px;
+            margin-top: 1rem;
+            width: 100% !important;
+            height: 300px !important; /* Fijamos una altura para que siempre sea visible */
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .main-content {
@@ -301,7 +316,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
     <!-- Contenido principal -->
-    <div class="main-content">
+    <div class="main-content" id="mainContent">
         <!-- Configuración -->
         <div id="config" class="section">
             <h1>Configuración del Dispositivo</h1>
@@ -356,7 +371,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
-        <!-- Otras secciones -->
+        <!-- Información -->
         <div id="info" class="section hidden">
             <h1>Información del Dispositivo</h1>
             <form id="getInfoForm">
@@ -364,18 +379,23 @@ const char index_html[] PROGMEM = R"rawliteral(
             </form>
         </div>
 
+        <!-- Sensor (aquí añadimos el canvas para el gráfico) -->
         <div id="sensor" class="section hidden">
             <h1>Datos del Sensor</h1>
             <form id="getSensorForm">
                 <button class="btn-secondary" type="submit">Obtener Datos</button>
             </form>
+            <!-- Canvas para mostrar el gráfico en tiempo real -->
+            <canvas id="gyroChart"></canvas>
         </div>
 
+        <!-- Respuestas -->
         <div id="responses" class="section hidden">
             <h1>Respuestas del ESP32</h1>
             <pre id="output">Esperando datos...</pre>
         </div>
 
+        <!-- Reiniciar -->
         <div id="restart" class="section hidden">
             <h1>Reinicio del Dispositivo</h1>
             <form id="restartForm">
@@ -387,25 +407,112 @@ const char index_html[] PROGMEM = R"rawliteral(
     <script>
         const SECURITY_CODE = "88888888";
         let menuVisible = true;
+        let gyroChart; 
+        let isSocketOpen = false;
+
+        // Función para inicializar el Chart.js con simbología adicional
+        function setupChart() {
+            const ctx = document.getElementById('gyroChart').getContext('2d');
+            gyroChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [], // Etiquetas de tiempo
+                    datasets: [{
+                        label: 'Magnitud Giroscopio',
+                        data: [],
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Magnitud del Giroscopio en Tiempo Real',
+                            color: '#ffffff',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Valor: ' + context.parsed.y.toFixed(2) + ' °/s';
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0  // desactivar animaciones para que sea "real time"
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Tiempo (HH:MM:SS)',
+                                color: '#afafaf'
+                            },
+                            grid: {
+                                color: 'rgba(175, 175, 175, 0.2)'
+                            },
+                            ticks: {
+                                color: '#afafaf',
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 10
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Magnitud (°/s)',
+                                color: '#afafaf'
+                            },
+                            grid: {
+                                color: 'rgba(175, 175, 175, 0.2)'
+                            },
+                            ticks: {
+                                color: '#afafaf'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
 
         // Manejar login
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const password = document.getElementById('password').value;
-            
+
             if (password === SECURITY_CODE) {
                 document.getElementById('loginContainer').style.display = 'none';
                 document.querySelector('.sidebar').classList.add('visible');
                 document.querySelector('.main-content').style.display = 'block';
                 document.querySelector('.sidebar-toggle').style.display = 'block';
-                
+
                 // Mostrar sección de configuración por defecto
                 document.getElementById('config').classList.remove('hidden');
+                // Asegurarse de que la ventana esté en top
+                window.scrollTo(0, 0);
             } else {
                 document.getElementById('error-message').style.display = 'block';
-                // Limpiar campo de contraseña
                 document.getElementById('password').value = '';
-                // Enfocar campo nuevamente
                 document.getElementById('password').focus();
             }
         });
@@ -422,24 +529,37 @@ const char index_html[] PROGMEM = R"rawliteral(
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const sectionId = link.getAttribute('data-section');
-                
+
                 // Actualizar menú
                 document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
                 link.classList.add('active');
-                
-                // Mostrar sección
+
+                // Mostrar sección correcta
                 document.querySelectorAll('.section').forEach(section => {
                     section.classList.add('hidden');
                 });
-                document.getElementById(sectionId).classList.remove('hidden');
+                const target = document.getElementById(sectionId);
+                target.classList.remove('hidden');
+
+                // Force scroll a top de la sección para que sea visible
+                target.scrollIntoView({ behavior: 'instant' });
             });
         });
 
-        // WebSocket y lógica de comunicación con el ESP32
+        // Configuración de WebSocket y lógica de comunicación con el ESP32
         const socket = new WebSocket('ws://' + window.location.hostname + '/ws');
 
         socket.addEventListener('open', (event) => {
             console.log('Conexión WebSocket establecida');
+            isSocketOpen = true;
+
+            // Cada segundo solicitamos datos del sensor automáticamente
+            setInterval(() => {
+                if (isSocketOpen) {
+                    const message = JSON.stringify({ command: "get_sensor" });
+                    socket.send(message);
+                }
+            }, 1000);
         });
 
         socket.addEventListener('message', (event) => {
@@ -457,8 +577,34 @@ const char index_html[] PROGMEM = R"rawliteral(
                 document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
             }
 
-            // Mostrar la respuesta en el área de salida
+            // Mostrar toda la respuesta JSON en la sección de "Respuestas"
             output.textContent = JSON.stringify(data, null, 2);
+
+            // Si el JSON contiene datos del sensor (gyroX, gyroY, gyroZ), actualizamos el gráfico
+            if (data.gyroX !== undefined && data.gyroY !== undefined && data.gyroZ !== undefined) {
+                const gx = parseFloat(data.gyroX);
+                const gy = parseFloat(data.gyroY);
+                const gz = parseFloat(data.gyroZ);
+                // Calculamos magnitud del vector giroscopio
+                const mag = Math.sqrt(gx * gx + gy * gy + gz * gz);
+
+                // Tomamos el tiempo actual como etiqueta
+                const now = new Date();
+                const timeLabel = now.getHours().toString().padStart(2, '0') + ":" +
+                                  now.getMinutes().toString().padStart(2, '0') + ":" +
+                                  now.getSeconds().toString().padStart(2, '0');
+
+                // Limitamos a 100 puntos en pantalla
+                if (gyroChart.data.labels.length >= 100) {
+                    gyroChart.data.labels.shift();
+                    gyroChart.data.datasets[0].data.shift();
+                }
+
+                // Añadimos nuevo punto
+                gyroChart.data.labels.push(timeLabel);
+                gyroChart.data.datasets[0].data.push(mag);
+                gyroChart.update();
+            }
         });
 
         socket.addEventListener('error', (event) => {
@@ -467,6 +613,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         socket.addEventListener('close', (event) => {
             console.log('Conexión WebSocket cerrada');
+            isSocketOpen = false;
         });
 
         // Obtener la configuración actual
@@ -507,7 +654,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             socket.send(message);
         });
 
-        // Obtener datos del sensor
+        // Obtener datos del sensor (manual)
         document.getElementById('getSensorForm').addEventListener('submit', (event) => {
             event.preventDefault();
             const message = JSON.stringify({ command: "get_sensor" });
@@ -529,15 +676,19 @@ const char index_html[] PROGMEM = R"rawliteral(
                 socket.send(message);
             }
         });
-        
-        // Enfocar campo de contraseña al cargar
+
+        // En el onload, enfocamos el campo de contraseña y además inicializamos el gráfico
         window.onload = function() {
             document.getElementById('password').focus();
+            setupChart();
         };
     </script>
 </body>
 </html>
 )rawliteral";
+
+
+
 
 
 

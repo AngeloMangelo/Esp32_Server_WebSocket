@@ -1,0 +1,719 @@
+R"rawliteral(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración ESP32</title>
+    <style>
+        :root {
+            --primary:#424669 ;
+            --secondary: #2E3150;
+            --text: #afafaf;
+            --card: #2E3150;
+            --danger: #F44336;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: var(--secondary);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden; /* Evitar scroll antes del login */
+        }
+
+        /* Menú lateral */
+        .sidebar {
+            width: 250px;
+            background: var(--card);
+            padding: 1.5rem;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            display: none; /* Ocultar inicialmente */
+        }
+
+        .sidebar.visible {
+            display: block; /* Mostrar solo después de login */
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            left: 10px;
+            top: 10px;
+            z-index: 1001;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none; /* Ocultar inicialmente */
+        }
+
+        .sidebar h2 {
+            color: white;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar ul li {
+            margin-bottom: 1rem;
+        }
+
+        .sidebar ul li a {
+            color: white;
+            text-decoration: none;
+            display: block;
+            padding: 0.8rem;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .sidebar ul li a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar ul li a.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Contenido principal */
+        .main-content {
+            background-color: #2E3150;
+            margin-left: 250px;
+            padding: 2rem;
+            transition: margin-left 0.3s ease;
+            display: none; /* Ocultar inicialmente */
+        }
+
+        .section {
+            background-color: #424669;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Formularios */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #008cdd;
+        }
+
+        button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        /* Respuestas */
+        #response-section pre {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+        /* Login */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+        }
+
+        .login-box {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .reset-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.visible {
+                transform: translateX(0);
+            }
+        }
+
+
+
+        /* Nuevos estilos para la sección de gráficos */
+        .chart-container {
+            position: relative;
+            height: 60vh;
+            width: 100%;
+            background-color: #2a2d4a;
+            border-radius: 10px;
+            margin-top: 1rem;
+            padding: 1rem;
+        }
+        
+        .chart-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .axis-selector {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .axis-btn {
+            padding: 0.5rem 1rem;
+            background-color: #3a3f6b;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .axis-btn.active {
+            background-color: #008cdd;
+        }
+    </style>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Login -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <h2>Acceso Seguro</h2>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="password">Código de Seguridad:</label>
+                    <input type="password" id="password" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn-primary">Ingresar</button>
+            </form>
+            <p id="error-message" style="color: #F44336; display: none;">Código incorrecto</p>
+        </div>
+    </div>
+
+    <!-- Menú -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="sidebar">
+        <h2>Menú</h2>
+        <ul>
+            <li><a href="#" data-section="config" class="active">Configuración</a></li>
+            <li><a href="#" data-section="info">Información</a></li>
+            <li><a href="#" data-section="sensor">Sensor</a></li>
+            <li><a href="#" data-section="responses">Respuestas</a></li>
+            <li><a href="#" data-section="restart">Reiniciar</a></li>
+        </ul>
+        <button class="btn-secondary" onclick="toggleSidebar()" style="margin-top: 2rem; width: 100%;">
+            Ocultar Menú
+        </button>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="main-content">
+        <!-- Configuración -->
+        <div id="config" class="section">
+            <h1>Configuración del Dispositivo</h1>
+            <div class="form-grid">
+                <div>
+                    <form id="getConfigForm">
+                        <button class="btn-secondary" type="submit">Obtener Configuración</button>
+                    </form>
+                </div>
+                <div>
+                    <form id="setConfigForm">
+                        <div class="input-group">
+                            <label>WiFi SSID:</label>
+                            <input type="text" id="wifiSsid" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Contraseña WiFi:</label>
+                            <input type="password" id="wifiPassword" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Servidor MQTT:</label>
+                            <input type="text" id="mqttServer" required>
+                        </div>
+                        <div class="input-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <label>Puerto MQTT:</label>
+                                <input type="text" id="mqttPort" required>
+                            </div>
+                            <div>
+                                <label>Tema Principal:</label>
+                                <input type="text" id="mqttRootTopic" required>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Usuario MQTT:</label>
+                            <input type="text" id="mqttUser" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Contraseña MQTT:</label>
+                            <input type="password" id="mqttPassword" required>
+                        </div>
+                        <button class="btn-primary" type="submit">Guardar Configuración</button>
+                    </form>
+
+                    <!-- Sección de Reset a Valores por Defecto -->
+                    <div class="reset-section">
+                        <h3>Restablecer Configuración</h3>
+                        <p>Esta acción reseteará todos los parámetros a los valores por defecto.</p>
+                        <button id="resetDefaults" class="btn-danger">Restablecer a Valores por Defecto</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+         <!-- Nueva sección para el gráfico sísmico -->
+        <div id="seismic-graph" class="section hidden">
+            <h1>Gráfico Sísmico en Tiempo Real</h1>
+            <div class="chart-controls">
+                <div class="axis-selector">
+                    <button class="axis-btn active" data-axis="x">Eje X</button>
+                    <button class="axis-btn" data-axis="y">Eje Y</button>
+                    <button class="axis-btn" data-axis="z">Eje Z</button>
+                </div>
+                <button id="pause-resume" class="btn-secondary">Pausar</button>
+                <button id="clear-chart" class="btn-danger">Limpiar</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="seismicChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Otras secciones -->
+        <div id="info" class="section hidden">
+            <h1>Información del Dispositivo</h1>
+            <form id="getInfoForm">
+                <button class="btn-secondary" type="submit">Actualizar Información</button>
+            </form>
+        </div>
+
+        <div id="sensor" class="section hidden">
+            <h1>Datos del Sensor</h1>
+            <form id="getSensorForm">
+                <button class="btn-secondary" type="submit">Obtener Datos</button>
+            </form>
+        </div>
+
+        <div id="responses" class="section hidden">
+            <h1>Respuestas del ESP32</h1>
+            <pre id="output">Esperando datos...</pre>
+        </div>
+
+        <div id="restart" class="section hidden">
+            <h1>Reinicio del Dispositivo</h1>
+            <form id="restartForm">
+                <button class="btn-secondary" type="submit">Confirmar Reinicio</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const SECURITY_CODE = "88888888";
+        let menuVisible = true;
+
+        // Manejar login
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            
+            if (password === SECURITY_CODE) {
+                document.getElementById('loginContainer').style.display = 'none';
+                document.querySelector('.sidebar').classList.add('visible');
+                document.querySelector('.main-content').style.display = 'block';
+                document.querySelector('.sidebar-toggle').style.display = 'block';
+                
+                // Mostrar sección de configuración por defecto
+                document.getElementById('config').classList.remove('hidden');
+            } else {
+                document.getElementById('error-message').style.display = 'block';
+                // Limpiar campo de contraseña
+                document.getElementById('password').value = '';
+                // Enfocar campo nuevamente
+                document.getElementById('password').focus();
+            }
+        });
+
+        // Toggle menú
+        function toggleSidebar() {
+            menuVisible = !menuVisible;
+            document.querySelector('.sidebar').classList.toggle('hidden');
+            document.querySelector('.main-content').style.marginLeft = menuVisible ? '250px' : '0';
+        }
+
+        // Navegación
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const sectionId = link.getAttribute('data-section');
+                
+                // Actualizar menú
+                document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+                link.classList.add('active');
+                
+                // Mostrar sección
+                document.querySelectorAll('.section').forEach(section => {
+                    section.classList.add('hidden');
+                });
+                document.getElementById(sectionId).classList.remove('hidden');
+            });
+        });
+
+        // WebSocket y lógica de comunicación con el ESP32
+        const socket = new WebSocket('ws://' + window.location.hostname + '/ws');
+
+        socket.addEventListener('open', (event) => {
+            console.log('Conexión WebSocket establecida');
+        });
+
+        socket.addEventListener('message', (event) => {
+            const output = document.getElementById('output');
+            const data = JSON.parse(event.data);
+
+            // Si la respuesta es la configuración actual, rellenar el formulario
+            if (data.User !== undefined) {
+                document.getElementById('wifiSsid').value = data.wifi_Ssid || "";
+                document.getElementById('wifiPassword').value = data.wifi_Password || "";
+                document.getElementById('mqttServer').value = data.mqtt_Server || "";
+                document.getElementById('mqttPort').value = data.mqtt_brokerPort || "";
+                document.getElementById('mqttUser').value = data.mqtt_User || "";
+                document.getElementById('mqttPassword').value = data.mqtt_Password || "";
+                document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
+            }
+
+            // Mostrar la respuesta en el área de salida
+            output.textContent = JSON.stringify(data, null, 2);
+        });
+
+        socket.addEventListener('error', (event) => {
+            console.error('Error en la conexión WebSocket:', event);
+        });
+
+        socket.addEventListener('close', (event) => {
+            console.log('Conexión WebSocket cerrada');
+        });
+
+        // Obtener la configuración actual
+        document.getElementById('getConfigForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "get_config" });
+            socket.send(message);
+        });
+
+        // Actualizar la configuración
+        document.getElementById('setConfigForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const config = {
+                command: "set_config",
+                value: {
+                    User: "admin",
+                    Password: "admin",
+                    wifi_Ssid: document.getElementById('wifiSsid').value,
+                    wifi_Password: document.getElementById('wifiPassword').value,
+                    ap_Ssid: "ESP32_IoT",
+                    ap_Password: "1234567890",
+                    mqtt_enabled: true,
+                    mqtt_Server: document.getElementById('mqttServer').value,
+                    mqtt_brokerPort: document.getElementById('mqttPort').value,
+                    mqtt_User: document.getElementById('mqttUser').value,
+                    mqtt_Password: document.getElementById('mqttPassword').value,
+                    mqtt_RootTopic: document.getElementById('mqttRootTopic').value
+                }
+            };
+            const message = JSON.stringify(config);
+            socket.send(message);
+        });
+
+        // Obtener información del dispositivo
+        document.getElementById('getInfoForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "get_info" });
+            socket.send(message);
+        });
+
+        // Obtener datos del sensor
+        document.getElementById('getSensorForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "get_sensor" });
+            socket.send(message);
+        });
+
+        // Reiniciar el ESP32
+        document.getElementById('restartForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = JSON.stringify({ command: "restart" });
+            socket.send(message);
+        });
+
+        // Resetear a valores por defecto
+        document.getElementById('resetDefaults').addEventListener('click', (event) => {
+            event.preventDefault();
+            if (confirm('¿Estás seguro de que deseas restablecer todos los parámetros a los valores por defecto?')) {
+                const message = JSON.stringify({ command: "reset_defaults" });
+                socket.send(message);
+            }
+        });
+        
+        // Enfocar campo de contraseña al cargar
+        window.onload = function() {
+            document.getElementById('password').focus();
+        };
+
+
+
+
+        // Variables para el gráfico
+        let seismicChart;
+        let chartData = {
+            datasets: [{
+                label: 'Aceleración X',
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                borderWidth: 1,
+                pointRadius: 0,
+                data: [],
+                tension: 0.4
+            }, {
+                label: 'Aceleración Y',
+                borderColor: 'rgb(54, 162, 235)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                borderWidth: 1,
+                pointRadius: 0,
+                data: [],
+                tension: 0.4,
+                hidden: true
+            }, {
+                label: 'Aceleración Z',
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                borderWidth: 1,
+                pointRadius: 0,
+                data: [],
+                tension: 0.4,
+                hidden: true
+            }]
+        };
+        
+        let isPaused = false;
+        let sampleCount = 0;
+        const maxSamples = 200;
+        
+        // Inicializar gráfico
+        function initSeismicChart() {
+            const ctx = document.getElementById('seismicChart').getContext('2d');
+            seismicChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Aceleración (g)',
+                                color: '#afafaf'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#afafaf'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Muestras',
+                                color: '#afafaf'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#afafaf'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#afafaf'
+                            }
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Actualizar gráfico con nuevos datos
+        function updateChart(data) {
+            if (isPaused) return;
+            
+            // Agregar nuevos datos
+            chartData.datasets[0].data.push({x: sampleCount, y: data.accelX});
+            chartData.datasets[1].data.push({x: sampleCount, y: data.accelY});
+            chartData.datasets[2].data.push({x: sampleCount, y: data.accelZ});
+            sampleCount++;
+            
+            // Limitar el número de muestras
+            if (chartData.datasets[0].data.length > maxSamples) {
+                chartData.datasets.forEach(dataset => {
+                    dataset.data.shift();
+                });
+            }
+            
+            // Actualizar gráfico
+            seismicChart.update('none');
+        }
+        
+        // Event Listeners para controles del gráfico
+        document.querySelectorAll('.axis-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const axis = this.dataset.axis;
+                const index = ['x', 'y', 'z'].indexOf(axis);
+                
+                // Toggle botón activo
+                document.querySelectorAll('.axis-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Mostrar/ocultar datasets
+                chartData.datasets.forEach((dataset, i) => {
+                    dataset.hidden = (i !== index);
+                });
+                
+                seismicChart.update();
+            });
+        });
+        
+        document.getElementById('pause-resume').addEventListener('click', function() {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'Reanudar' : 'Pausar';
+        });
+        
+        document.getElementById('clear-chart').addEventListener('click', function() {
+            chartData.datasets.forEach(dataset => {
+                dataset.data = [];
+            });
+            sampleCount = 0;
+            seismicChart.update();
+        });
+        
+        // Inicializar gráfico cuando se muestre la sección
+        document.querySelector('a[data-section="seismic-graph"]').addEventListener('click', function() {
+            if (!seismicChart) {
+                initSeismicChart();
+            }
+        });
+        
+        // Modificar el evento de mensaje WebSocket para actualizar el gráfico
+        socket.addEventListener('message', (event) => {
+            const data = JSON.parse(event.data);
+            
+            // Actualizar gráfico si hay datos de aceleración
+            if (data.accelX !== undefined) {
+                updateChart(data);
+                
+                // También mostrar en la consola de respuestas
+                const output = document.getElementById('output');
+                output.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+    </script>
+</body>
+</html>
+)rawliteral"
