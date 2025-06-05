@@ -65,7 +65,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             margin: 0;
             background-color: var(--secondary);
             color: var(--text);
-            /* Eliminamos overflow: hidden para permitir scroll si fuera necesario */
         }
 
         /* Menú lateral */
@@ -218,13 +217,16 @@ const char index_html[] PROGMEM = R"rawliteral(
             transform: translateY(-2px);
         }
 
-        /* Respuestas */
-        #response-section pre {
+        /* Respuestas y Bloques de texto */
+        pre {
             background: var(--card);
-            padding: 1.5rem;
+            padding: 1rem;
             border-radius: 8px;
             white-space: pre-wrap;
             font-family: monospace;
+            color: #ffffff;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
         /* Login */
@@ -377,6 +379,8 @@ const char index_html[] PROGMEM = R"rawliteral(
             <form id="getInfoForm">
                 <button class="btn-secondary" type="submit">Actualizar Información</button>
             </form>
+            <!-- Pre para mostrar la salida de get_info -->
+            <pre id="infoOutput">Esperando información del dispositivo...</pre>
         </div>
 
         <!-- Sensor (aquí añadimos el canvas para el gráfico) -->
@@ -407,7 +411,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <script>
         const SECURITY_CODE = "88888888";
         let menuVisible = true;
-        let gyroChart; 
+        let gyroChart;
         let isSocketOpen = false;
 
         // Función para inicializar el Chart.js con simbología adicional
@@ -506,9 +510,8 @@ const char index_html[] PROGMEM = R"rawliteral(
                 document.querySelector('.main-content').style.display = 'block';
                 document.querySelector('.sidebar-toggle').style.display = 'block';
 
-                // Mostrar sección de configuración por defecto
+                // Mostrar sección de configuración por defecto y scrollear arriba
                 document.getElementById('config').classList.remove('hidden');
-                // Asegurarse de que la ventana esté en top
                 window.scrollTo(0, 0);
             } else {
                 document.getElementById('error-message').style.display = 'block';
@@ -534,14 +537,12 @@ const char index_html[] PROGMEM = R"rawliteral(
                 document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
                 link.classList.add('active');
 
-                // Mostrar sección correcta
+                // Mostrar sección correcta y scrollear a ella
                 document.querySelectorAll('.section').forEach(section => {
                     section.classList.add('hidden');
                 });
                 const target = document.getElementById(sectionId);
                 target.classList.remove('hidden');
-
-                // Force scroll a top de la sección para que sea visible
                 target.scrollIntoView({ behavior: 'instant' });
             });
         });
@@ -564,6 +565,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         socket.addEventListener('message', (event) => {
             const output = document.getElementById('output');
+            const infoOutput = document.getElementById('infoOutput');
             const data = JSON.parse(event.data);
 
             // Si la respuesta es la configuración actual, rellenar el formulario
@@ -575,6 +577,11 @@ const char index_html[] PROGMEM = R"rawliteral(
                 document.getElementById('mqttUser').value = data.mqtt_User || "";
                 document.getElementById('mqttPassword').value = data.mqtt_Password || "";
                 document.getElementById('mqttRootTopic').value = data.mqtt_RootTopic || "";
+            }
+
+            // Si la respuesta es get_info (device info), mostrar en infoOutput
+            if (data.id !== undefined && data.name !== undefined) {
+                infoOutput.textContent = JSON.stringify(data, null, 2);
             }
 
             // Mostrar toda la respuesta JSON en la sección de "Respuestas"
@@ -686,6 +693,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
 
 
 
